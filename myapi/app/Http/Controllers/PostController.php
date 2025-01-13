@@ -13,13 +13,30 @@ class PostController extends Controller
         $value = $request->input('value');
 
         // Save data to in-memory cache
-        Cache::put($key, $value, 60); // 60 minutes expiration
+        Cache::put($key, $value, 6000000); // 60 minutes expiration
 
+        // internal mechanism to cache..basic
+        $keys = Cache::get('cache_keys', []);
+        $keys[] = $key;
+        Cache::forever('cache_keys', $keys);
 
-        $stored = Cache::get($key);
-
-        return response()->json(['status' => 'success', 'key'=> $key,  'value'=> $value, 'stored'=>$stored, 'message' => 'Data saved to cache successfully.']);
+        return response()->json(['status' => 'success', 'key'=> $key,  'value'=> $value, 'message' => 'Data saved to cache successfully.']);
     }
+
+    public function list()
+    {
+            // Get key list
+            $keys = Cache::get('cache_keys', []);
+
+            // Retrieve all cache items
+            $cacheData = [];
+            foreach ($keys as $key) {
+                $cacheData[$key] = Cache::get($key);
+            }
+
+            return response()->json(['status' => 'success', 'message' => $cacheData]);
+    }
+
 
     public function get($key)
     {
@@ -43,10 +60,17 @@ class PostController extends Controller
     }
 
 
-    public function destroy($key)
+    public function forget($key)
     {
         if (Cache::has($key)) {
             Cache::forget($key);
+
+            // Get existing key list
+            $keys = Cache::get('cache_keys', []);
+            $keys = array_diff($keys, [$key]);
+            // Save updated key list
+            Cache::forever('cache_keys', $keys);
+
             return response()->json(['message' => 'Cache item deleted successfully.'], 200);
         } else {
             return response()->json(['message' => 'Cache item not found.'], 404);
